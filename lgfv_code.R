@@ -1,12 +1,13 @@
 ###### I. Import the Packages and Data######
+
 library("readxl")
 library("fixest")
 library("dplyr")
 library("psych")
 library("ggplot2")
-train_df <- read_excel("C:/Users/hp/Desktop/城投债/数据/LGFV_bonds.xlsx",
+train_df <- read_excel("C:/Users/hp/Desktop/University of Arizona/本科论文/城投债/数据/LGFV.xlsx",
                         sheet=2)
-df <- read_excel("C:/Users/hp/Desktop/城投债/数据/LGFV_bonds.xlsx",
+df <- read_excel("C:/Users/hp/Desktop/University of Arizona/本科论文/城投债/数据/LGFV.xlsx",
                  sheet=1)
 
 ###### II. Run the Regression to Train the Weights######
@@ -30,19 +31,19 @@ df$IIS <- df$second_share*weights[1]+
   df$tertiary_share*weights[2]
 
 #DSI: Debt Structure Index
-df$DSI <- log(df$LGFV_bond)-log(df$statutory_debt)
+df$DCI <- log(df$LGFV)-log(df$statutory)
 
 #rDebt: Ratio of the debts
-df$rDebt <- (df$statutory_debt+df$LGFV_bond)/df$gdp
+df$rDebt <- (df$statutory+df$LGFV)/df$gdp
 
 #rtrade: The ratio of the international trades
 df$rtrade <- df$trade/df$gdp
 
 #view the data
 summary_df <- data.frame("IIS"=df$IIS,
-                         "lnLGFV"=log(df$LGFV_bond),
-                         "lnStatu"=log(df$statutory_debt),
-                         "DSI"=df$DSI,
+                         "lnLGFV"=log(df$LGFV),
+                         "lnStatu"=log(df$statutory),
+                         "DCI"=df$DCI,
                          "rDebt",df$rDebt,
                          "lnPopulation"=log(df$population),
                          "rtrade"=df$rtrade
@@ -52,7 +53,7 @@ describe(summary_df)
 
 ###### IV. Run the Basic Regressions######
 #model.1: IIS ~ statutory_debt+LFGV_bond
-lm.1  <- feols(IIS~log(statutory_debt)+log(LGFV_bond)|year+province,
+lm.1  <- feols(IIS~log(statutory)+log(LGFV)|year+province,
                data=df,cluster=~province)
 
 summary(lm.1)
@@ -63,8 +64,8 @@ lm.2 <- feols(IIS~rDebt|year+province,
 
 summary(lm.2)
 
-#model.3 IIS ~ DSI
-lm.3 <- feols(IIS~DSI|year+province,
+#model.3 IIS ~ DCI
+lm.3 <- feols(IIS~DCI|year+province,
               data=df,cluster=~province)
 
 summary(lm.3)
@@ -74,45 +75,45 @@ summary(lm.3)
 #add controls one by one
 
 # main model.1: Add rDebt as control
-lm.main.1 <- feols(IIS~DSI+rDebt|year+province,
+lm.main.1 <- feols(IIS~DCI+rDebt|year+province,
                  data=df,cluster=~province)
 
 summary(lm.main.1)
 
 # main model.2: Add log(population) as control
-lm.main.2 <- feols(IIS~DSI+rDebt+log(population)|year+province,
+lm.main.2 <- feols(IIS~DCI+rDebt+log(population)|year+province,
                  data=df,cluster=~province)
 
 summary(lm.main.2)
 
-lm.main <- feols(IIS~DSI+rDebt+log(population)+rtrade|province+year,
+lm.main <- feols(IIS~DCI+rDebt+log(population)+rtrade|province+year,
                  data=df,cluster=~province)
 
 summary(lm.main)
 
 ###### VI. Check the Robustness######
 
-# Robust model.1: Replace the response variable
+# Robust model.1: Replace the dependent variable
 # Robust model.1: Use log(tertiary_share/(1-tertiary_share)) as response variable
-rlm.1 <- feols(log(tertiary_share/(1-tertiary_share))~DSI+rDebt+
+rlm.1 <- feols(log(tertiary_share/(1-tertiary_share))~DCI+rDebt+
                  log(population)+rtrade|province+year,
                data=df,cluster=~province)
 
 summary(rlm.1)
 
 # Robust model.1.alt: Use Use log(second_share/(1-second_share)) as response variable
-rlm.1.alt <- feols(log(second_share/(1-second_share))~DSI+rDebt+
+rlm.1.alt <- feols(log(second_share/(1-second_share))~DCI+rDebt+
                      log(population)+rtrade|province+year,
                    data=df,cluster=~province)
 
 summary(rlm.1.alt)
 
 # Robust model.2: Change the main explain variable
-# Robust model.2: Change the DSI with LGFV_bond/(LGFV_bond+statutary_debt)
+# Robust model.2: Change the DCI with LGFV/(LGFV+statutary)
 # define the DSI_alt
-df$DSI_alt <- df$LGFV_bond/(df$LGFV_bond+df$statutory_debt)
+df$DCI_alt <- df$LGFV/(df$LGFV+df$statutory)
 
-rlm.2 <- feols(IIS~DSI_alt+rDebt+log(population)+rtrade|province+year,
+rlm.2 <- feols(IIS~DCI_alt+rDebt+log(population)+rtrade|province+year,
                  data=df,cluster=~province)
 
 summary(rlm.2)
@@ -128,14 +129,14 @@ municipality <- which(df$province=="Beijing"|
 df_province <- df[-municipality,]
 
 # Run the regression again
-rlm.3 <- feols(IIS~DSI+rDebt+log(population)+rtrade|year+province,
+rlm.3 <- feols(IIS~DCI+rDebt+log(population)+rtrade|year+province,
                data=df_province,cluster=~province)
 
 summary(rlm.3)
 
 # Robust model.4: Lag model
 rlm.4 <- feols(
-  IIS ~ l(DSI,1)+l(rDebt,1)+log(population)+rtrade|province + year,
+  IIS ~ l(DCI,1)+l(rDebt,1)+log(population)+rtrade|province + year,
   data=df,
   panel.id=~ province + year,
   cluster=~province
@@ -162,7 +163,7 @@ diag_df <- df %>%
 
 head(
   diag_df %>%
-    select(province, year, IIS, DSI, rDebt, fitted, residual),
+    select(province, year, IIS, DCI, rDebt, fitted, residual),
   10
 )
 
